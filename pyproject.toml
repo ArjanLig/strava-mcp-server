@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "strava-training-mcp"
+version = "1.0.2"
+description = "MCP server for Strava — training load analysis, weekly plans & activity tracking for Claude Desktop"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "ArjanLig" }
+]
+keywords = [
+    "mcp",
+    "mcp-server",
+    "strava",
+    "claude",
+    "training-load",
+    "cycling",
+    "model-context-protocol"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "mcp>=0.9.0",
+    "stravalib>=1.6.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ArjanLig/strava-mcp-server"
+Repository = "https://github.com/ArjanLig/strava-mcp-server"
+Issues = "https://github.com/ArjanLig/strava-mcp-server/issues"
