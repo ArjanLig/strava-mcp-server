@@ -29,15 +29,41 @@ if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
     echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION gevonden"
 else
-    echo -e "  ${RED}✗ Python 3 niet gevonden!${NC}"
+    echo -e "  ${YELLOW}!${NC} Python 3 niet gevonden. Wordt nu geinstalleerd..."
     echo ""
-    echo "  Installeer Python 3:"
-    echo "    - Download via https://www.python.org/downloads/"
-    echo "    - Of via Homebrew: brew install python3"
-    echo ""
-    echo "  Druk op Enter om af te sluiten..."
-    read
-    exit 1
+
+    # Detecteer chip type voor juiste installer
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ]; then
+        PKG_URL="https://www.python.org/ftp/python/3.13.2/python-3.13.2-macos11.pkg"
+    else
+        PKG_URL="https://www.python.org/ftp/python/3.13.2/python-3.13.2-macos11.pkg"
+    fi
+
+    PKG_FILE="/tmp/python-installer.pkg"
+
+    echo -e "  Downloaden van python.org..."
+    curl -L -o "$PKG_FILE" "$PKG_URL" 2>/dev/null
+
+    echo -e "  Installeren (je moet mogelijk je wachtwoord invoeren)..."
+    sudo installer -pkg "$PKG_FILE" -target /
+    rm -f "$PKG_FILE"
+
+    # Refresh PATH zodat python3 gevonden wordt
+    export PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:$PATH"
+
+    if command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+        PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
+        echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION geinstalleerd"
+    else
+        echo -e "  ${RED}✗ Python installatie mislukt.${NC}"
+        echo "  Download handmatig via https://www.python.org/downloads/"
+        echo ""
+        echo "  Druk op Enter om af te sluiten..."
+        read
+        exit 1
+    fi
 fi
 
 # ============= STAP 2: Bestanden kopieren =============
