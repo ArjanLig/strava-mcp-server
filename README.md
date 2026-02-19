@@ -99,3 +99,5 @@ The DMG will be created in the `build/` folder.
 ## License
 
 MIT
+
+<!-- mcp-name: io.github.ArjanLig/strava-mcp-server -->

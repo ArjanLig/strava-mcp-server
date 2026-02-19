@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.ArjanLig/strava-mcp-server",
+  "description": "MCP server for Strava — training load analysis (ATL/CTL/TSB), weekly training plans & activity tracking for Claude Desktop",
+  "repository": {
+    "url": "https://github.com/ArjanLig/strava-mcp-server",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registry_type": "pypi",
+      "identifier": "strava-mcp-server",
+      "version": "1.0.0"
+    }
+  ]
+}
