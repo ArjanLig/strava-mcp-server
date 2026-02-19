@@ -144,20 +144,21 @@ if [ -f "$CLAUDE_CONFIG_FILE" ]; then
     if grep -q '"strava"' "$CLAUDE_CONFIG_FILE"; then
         echo -e "  ${GREEN}✓${NC} Strava MCP al geconfigureerd in Claude Desktop"
     else
-        # Voeg strava toe aan bestaande config met python
+        # Voeg strava toe aan bestaande config met python (paden via argv)
         "$INSTALL_DIR/.venv/bin/python" -c "
-import json
-with open('$CLAUDE_CONFIG_FILE', 'r') as f:
+import json, sys
+config_file, python_path, server_path = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(config_file, 'r') as f:
     config = json.load(f)
 if 'mcpServers' not in config:
     config['mcpServers'] = {}
 config['mcpServers']['strava'] = {
-    'command': '$VENV_PYTHON',
-    'args': ['$SERVER_PATH']
+    'command': python_path,
+    'args': [server_path]
 }
-with open('$CLAUDE_CONFIG_FILE', 'w') as f:
+with open(config_file, 'w') as f:
     json.dump(config, f, indent=2)
-"
+" "$CLAUDE_CONFIG_FILE" "$VENV_PYTHON" "$SERVER_PATH"
         echo -e "  ${GREEN}✓${NC} Strava MCP toegevoegd aan bestaande Claude Desktop config"
     fi
 else

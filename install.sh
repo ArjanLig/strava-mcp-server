@@ -66,21 +66,22 @@ CONFIG_FILE="$CONFIG_DIR/claude_desktop_config.json"
 mkdir -p "$CONFIG_DIR"
 
 if [ -f "$CONFIG_FILE" ]; then
-    # Bestaande config: voeg strava toe met python
+    # Bestaande config: voeg strava toe met python (paden via argv)
     "$SCRIPT_DIR/.venv/bin/python" -c "
-import json
-with open('$CONFIG_FILE', 'r') as f:
+import json, sys
+config_file, python_path, server_path = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(config_file, 'r') as f:
     config = json.load(f)
 if 'mcpServers' not in config:
     config['mcpServers'] = {}
 config['mcpServers']['strava'] = {
-    'command': '$PYTHON_PATH',
-    'args': ['$SERVER_PATH']
+    'command': python_path,
+    'args': [server_path]
 }
-with open('$CONFIG_FILE', 'w') as f:
+with open(config_file, 'w') as f:
     json.dump(config, f, indent=2)
 print('   ✅ Strava toegevoegd aan bestaande config')
-"
+" "$CONFIG_FILE" "$PYTHON_PATH" "$SERVER_PATH"
 else
     # Nieuwe config
     cat > "$CONFIG_FILE" << CONFIGEOF

@@ -1,10 +1,13 @@
 import os
+import stat
 import asyncio
+import tempfile
 from datetime import datetime, timedelta
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 from stravalib.client import Client
+from stravalib.exc import AccessUnauthorized
 from dotenv import load_dotenv
 
 # Laad credentials
@@ -26,14 +29,13 @@ def get_authenticated_client():
 
     # Check of token nog geldig is door een test request
     try:
-        # Simpele test call
         client.get_athlete()
         return client
-    except:
+    except AccessUnauthorized:
         # Token verlopen, ververs het
         print("Token verlopen, vernieuwen...")
         token_response = client.refresh_access_token(
-            client_id = client_id,
+            client_id=client_id,
             client_secret=client_secret,
             refresh_token=refresh_token
         )
@@ -50,20 +52,27 @@ def get_authenticated_client():
 
 
 def update_env_tokens(access_token, refresh_token):
-    """Update .env bestand met nieuwe tokens"""
+    """Update .env bestand met nieuwe tokens (atomic write)"""
     env_path = os.path.join(os.path.dirname(__file__), '.env')
 
     with open(env_path, 'r') as file:
         lines = file.readlines()
 
-    with open(env_path, 'w') as file:
-        for line in lines:
-            if line.startswith('STRAVA_ACCESS_TOKEN='):
-                file.write(f'STRAVA_ACCESS_TOKEN={access_token}\n')
-            elif line.startswith('STRAVA_REFRESH_TOKEN='):
-                file.write(f'STRAVA_REFRESH_TOKEN={refresh_token}\n')
-            else:
-                file.write(line)
+    fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(env_path))
+    try:
+        with os.fdopen(fd, 'w') as tmp_file:
+            for line in lines:
+                if line.startswith('STRAVA_ACCESS_TOKEN='):
+                    tmp_file.write(f'STRAVA_ACCESS_TOKEN={access_token}\n')
+                elif line.startswith('STRAVA_REFRESH_TOKEN='):
+                    tmp_file.write(f'STRAVA_REFRESH_TOKEN={refresh_token}\n')
+                else:
+                    tmp_file.write(line)
+        os.chmod(tmp_path, stat.S_IRUSR | stat.S_IWUSR)
+        os.replace(tmp_path, env_path)
+    except Exception:
+        os.unlink(tmp_path)
+        raise
 
     # Reload environment
     load_dotenv(override=True)
@@ -98,23 +107,19 @@ def calculate_training_loads(activities, days_atl=7, days_ctl=42):
 
     # Bereken ATL (laatste 7 dagen gemiddelde)
     atl_sum = 0
-    atl_count = 0
     for i in range(days_atl):
         date = (now - timedelta(days=i)).date()
         if date in daily_loads:
             atl_sum += daily_loads[date]
-            atl_count += 1
 
     atl = atl_sum / days_atl if days_atl > 0 else 0
 
     # Bereken CTL (laatste 42 dagen gemiddelde)
     ctl_sum = 0
-    ctl_count = 0
     for i in range(days_ctl):
         date = (now - timedelta(days=i)).date()
         if date in daily_loads:
             ctl_sum += daily_loads[date]
-            ctl_count += 1
 
     ctl = ctl_sum / days_ctl if days_ctl > 0 else 0
 
@@ -179,7 +184,6 @@ def calculate_weekly_trends(daily_loads, weeks=8):
     weekly_trends = []
 
     for week_offset in range(weeks):
-        week_start = now - timedelta(days=(week_offset + 1) * 7)
         week_end = now - timedelta(days=week_offset * 7)
 
         # ATL voor deze week (7 dagen gemiddelde)
@@ -262,75 +266,48 @@ def generate_weekly_recommendation(tsb, atl, ctl, ramp_rate_data):
 
     # Bepaal veilige volume aanpassing
     if ramp_rate_data and ramp_rate_data["rate"] > 10:
-        # Te snel gestegen, afbouwen
         target_hours = current_weekly_hours * 0.9
         volume_advice = "⬇️ Verlaag volume met 10% (te snelle opbouw)"
     elif tsb < -30:
-        # Zeer vermoeid
         target_hours = current_weekly_hours * 0.7
         volume_advice = "⬇️ Verlaag volume met 30% (herstel nodig)"
     elif tsb < -10:
-        # Licht vermoeid
         target_hours = current_weekly_hours * 0.85
         volume_advice = "⬇️ Verlaag volume met 15% (recovery week)"
     elif tsb > 15:
-        # Zeer fris, kan opbouwen
         target_hours = current_weekly_hours * 1.08
         volume_advice = "⬆️ Verhoog volume met 8% (goede vorm voor opbouw)"
     elif tsb > 5:
-        # Fris
         target_hours = current_weekly_hours * 1.05
         volume_advice = "⬆️ Verhoog volume met 5% (veilige progressie)"
     else:
-        # Stabiel
         target_hours = current_weekly_hours
         volume_advice = "➡️ Behoud huidig volume (goede balans)"
 
     # Bepaal workout mix
     if tsb < -30:
-        # Herstel focus
         plan = {
-            "endurance": 2,
-            "recovery": 2,
-            "intervals": 0,
-            "rest": 3
+            "endurance": 2, "recovery": 2, "intervals": 0, "rest": 3
         }
         intensity_note = "Focus op herstel - alleen zeer lichte ritten"
     elif tsb < -10:
-        # Light week
         plan = {
-            "endurance": 2,
-            "recovery": 2,
-            "intervals": 0,
-            "rest": 3
+            "endurance": 2, "recovery": 2, "intervals": 0, "rest": 3
         }
         intensity_note = "Recovery week - geen intensieve workouts"
     elif tsb < 5:
-        # Moderate training
         plan = {
-            "endurance": 3,
-            "tempo": 1,
-            "recovery": 1,
-            "rest": 2
+            "endurance": 3, "tempo": 1, "recovery": 1, "rest": 2
         }
         intensity_note = "Balanced week - endurance + 1x tempo"
     elif tsb < 15:
-        # Build week
         plan = {
-            "endurance": 2,
-            "tempo": 1,
-            "intervals": 1,
-            "recovery": 1,
-            "rest": 2
+            "endurance": 2, "tempo": 1, "intervals": 1, "recovery": 1, "rest": 2
         }
         intensity_note = "Build week - endurance + intensiteit mogelijk"
     else:
-        # Peak freshness - kan hard trainen
         plan = {
-            "endurance": 2,
-            "intervals": 2,
-            "recovery": 1,
-            "rest": 2
+            "endurance": 2, "intervals": 2, "recovery": 1, "rest": 2
         }
         intensity_note = "High intensity week - je bent fris genoeg!"
 
@@ -418,213 +395,167 @@ async def list_tools() -> list[Tool]:
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Voer tool uit"""
 
-    if name == "get_recent_activities":
-        limit = arguments.get("limit", 10)
-        activities = client.get_activities(limit=limit)
+    try:
+        if name == "get_recent_activities":
+            limit = min(int(arguments.get("limit", 10)), 30)
+            activities = client.get_activities(limit=limit)
 
-        result = "🚴 RECENTE ACTIVITEITEN\n\n"
-        for activity in activities:
-            date = activity.start_date_local.strftime("%d-%m-%Y %H:%M")
-            distance = round(float(activity.distance) / 1000, 1) if activity.distance else 0
-            duration = str(activity.moving_time).split('.')[0]  # HH:MM:SS
+            result = "🚴 RECENTE ACTIVITEITEN\n\n"
+            for activity in activities:
+                date = activity.start_date_local.strftime("%d-%m-%Y %H:%M")
+                distance = round(float(activity.distance) / 1000, 1) if activity.distance else 0
+                duration = str(activity.moving_time).split('.')[0]  # HH:MM:SS
 
-            result += f"📅 {date}\n"
-            result += f"   {activity.name}\n"
-            result += f"   📏 {distance} km | ⏱️ {duration}\n"
+                result += f"📅 {date}\n"
+                result += f"   {activity.name}\n"
+                result += f"   📏 {distance} km | ⏱️ {duration}\n"
+                if activity.average_heartrate:
+                    result += f"   ❤️ {int(activity.average_heartrate)} bpm avg\n"
+                result += f"   ID: {activity.id}\n\n"
+
+            return [TextContent(type="text", text=result)]
+
+        elif name == "get_activity_details":
+            activity_id = arguments["activity_id"]
+            try:
+                activity_id = int(activity_id)
+            except (ValueError, TypeError):
+                return [TextContent(type="text", text="Ongeldig activity ID. Moet een numerieke waarde zijn.")]
+
+            activity = client.get_activity(activity_id)
+
+            result = f"📊 ACTIVITEIT DETAILS\n\n"
+            result += f"🏷️ Naam: {activity.name}\n"
+            result += f"📅 Datum: {activity.start_date_local.strftime('%d-%m-%Y %H:%M')}\n"
+            result += f"📏 Afstand: {round(float(activity.distance) / 1000, 1)} km\n"
+            result += f"⏱️ Tijd: {activity.moving_time}\n"
+            result += f"⚡ Avg Speed: {round(float(activity.average_speed) * 3.6, 1)} km/u\n"
+
             if activity.average_heartrate:
-                result += f"   ❤️ {int(activity.average_heartrate)} bpm avg\n"
-            result += f"   ID: {activity.id}\n\n"
+                result += f"❤️ Avg HR: {int(activity.average_heartrate)} bpm\n"
+            if activity.max_heartrate:
+                result += f"❤️ Max HR: {int(activity.max_heartrate)} bpm\n"
+            if activity.average_watts:
+                result += f"⚡ Avg Power: {int(activity.average_watts)}W\n"
+            if activity.suffer_score:
+                result += f"💪 Suffer Score: {activity.suffer_score}\n"
 
-        return [TextContent(type="text", text=result)]
+            result += f"\n📝 Beschrijving: {activity.description or 'Geen beschrijving'}\n"
 
-    elif name == "get_activity_details":
-        activity_id = arguments["activity_id"]
-        activity = client.get_activity(activity_id)
+            return [TextContent(type="text", text=result)]
 
-        result = f"📊 ACTIVITEIT DETAILS\n\n"
-        result += f"🏷️ Naam: {activity.name}\n"
-        result += f"📅 Datum: {activity.start_date_local.strftime('%d-%m-%Y %H:%M')}\n"
-        result += f"📏 Afstand: {round(float(activity.distance) / 1000, 1)} km\n"
-        result += f"⏱️ Tijd: {activity.moving_time}\n"
-        result += f"⚡ Avg Speed: {round(float(activity.average_speed) * 3.6, 1)} km/u\n"
+        elif name == "get_weekly_stats":
+            weeks = min(int(arguments.get("weeks", 4)), 52)
+            activities = client.get_activities(limit=200)
 
-        if activity.average_heartrate:
-            result += f"❤️ Avg HR: {int(activity.average_heartrate)} bpm\n"
-        if activity.max_heartrate:
-            result += f"❤️ Max HR: {int(activity.max_heartrate)} bpm\n"
-        if activity.average_watts:
-            result += f"⚡ Avg Power: {int(activity.average_watts)}W\n"
-        if activity.suffer_score:
-            result += f"💪 Suffer Score: {activity.suffer_score}\n"
+            weekly_data = {}
+            now = datetime.now()
 
-        result += f"\n📝 Beschrijving: {activity.description or 'Geen beschrijving'}\n"
+            for activity in activities:
+                activity_date = activity.start_date_local.replace(tzinfo=None)
+                week_num = (now - activity_date).days // 7
 
-        return [TextContent(type="text", text=result)]
+                if week_num >= weeks:
+                    continue
 
+                week_label = f"Week -{week_num}" if week_num > 0 else "Deze week"
 
-    elif name == "get_weekly_stats":
+                if week_label not in weekly_data:
+                    weekly_data[week_label] = {
+                        "distance": 0,
+                        "time": timedelta(),
+                        "activities": 0
+                    }
 
-        weeks = arguments.get("weeks", 4)
+                weekly_data[week_label]["distance"] += float(activity.distance) / 1000
 
-        activities = client.get_activities(limit=200)
+                if activity.moving_time:
+                    weekly_data[week_label]["time"] += activity.moving_time
 
-        # Groepeer per week
+                weekly_data[week_label]["activities"] += 1
 
-        weekly_data = {}
+            result = f"📈 WEKELIJKSE STATISTIEKEN (laatste {weeks} weken)\n\n"
 
-        now = datetime.now()
+            for week in sorted(weekly_data.keys(), reverse=True):
+                data = weekly_data[week]
+                hours = data["time"].total_seconds() / 3600
 
-        for activity in activities:
+                result += f"{week}:\n"
+                result += f"  🚴 {data['activities']} ritten\n"
+                result += f"  📏 {round(data['distance'], 1)} km\n"
+                result += f"  ⏱️ {round(hours, 1)} uur\n\n"
 
-            activity_date = activity.start_date_local.replace(tzinfo=None)
+            return [TextContent(type="text", text=result)]
 
-            week_num = (now - activity_date).days // 7
+        elif name == "get_training_load_analysis":
+            activities = list(client.get_activities(limit=200))
 
-            if week_num >= weeks:
-                continue
+            loads = calculate_training_loads(activities)
+            recommendation = get_training_recommendation(
+                loads["tsb"], loads["atl"], loads["ctl"]
+            )
+            weekly_trends = calculate_weekly_trends(loads["daily_loads"], weeks=8)
+            ramp_rate = calculate_ramp_rate(weekly_trends)
 
-            week_label = f"Week -{week_num}" if week_num > 0 else "Deze week"
+            result = "🏋️ TRAINING LOAD ANALYSE\n\n"
+            result += f"📊 HUIDIGE STATUS\n"
+            result += f"ATL (Acute - 7 dagen): {loads['atl']}\n"
+            result += f"CTL (Chronic - 42 dagen): {loads['ctl']}\n"
+            result += f"TSB (Balance): {loads['tsb']}\n\n"
 
-            if week_label not in weekly_data:
-                weekly_data[week_label] = {
+            if ramp_rate:
+                result += f"📈 RAMP RATE (week-over-week)\n"
+                result += f"{ramp_rate['status']}: {ramp_rate['rate']:+.1f}%\n"
+                result += f"Vorige week ATL: {ramp_rate['previous_atl']}\n"
+                result += f"Deze week ATL: {ramp_rate['current_atl']}\n"
+                result += f"⚠️ {ramp_rate['warning']}\n\n"
 
-                    "distance": 0,
+            result += f"🎯 ADVIES: {recommendation['status']}\n"
+            result += f"{recommendation['advice']}\n\n"
+            result += f"💪 Aanbevolen intensiteit:\n{recommendation['intensity']}\n\n"
+            result += f"📈 Fitness context:\n{recommendation['fitness_context']}\n\n"
 
-                    "time": timedelta(),
+            result += f"📊 WEEKLY TRENDS (laatste 8 weken)\n"
+            result += f"{'Week':<12} {'ATL':>6} {'CTL':>6} {'TSB':>6}\n"
+            result += f"{'-' * 12} {'-' * 6} {'-' * 6} {'-' * 6}\n"
 
-                    "activities": 0
+            for trend in weekly_trends[-8:]:
+                result += f"{trend['week_label']:<12} {trend['atl']:>6.1f} {trend['ctl']:>6.1f} {trend['tsb']:>6.1f}\n"
 
-                }
+            return [TextContent(type="text", text=result)]
 
-            weekly_data[week_label]["distance"] += float(activity.distance) / 1000
+        elif name == "get_weekly_training_plan":
+            activities = list(client.get_activities(limit=200))
 
-            if activity.moving_time:
-                weekly_data[week_label]["time"] += activity.moving_time
+            loads = calculate_training_loads(activities)
+            weekly_trends = calculate_weekly_trends(loads["daily_loads"], weeks=8)
+            ramp_rate = calculate_ramp_rate(weekly_trends)
 
-            weekly_data[week_label]["activities"] += 1
+            plan = generate_weekly_recommendation(
+                loads["tsb"], loads["atl"], loads["ctl"], ramp_rate
+            )
 
-        result = f"📈 WEKELIJKSE STATISTIEKEN (laatste {weeks} weken)\n\n"
+            result = "📋 WEEKTRAINING PLAN\n\n"
+            result += f"⏱️ VOLUME ADVIES\n"
+            result += f"Huidige week: ~{plan['current_hours']} uur\n"
+            result += f"Aanbevolen: ~{plan['target_hours']} uur\n"
+            result += f"{plan['volume_advice']}\n\n"
 
-        for week in sorted(weekly_data.keys(), reverse=True):
-            data = weekly_data[week]
+            result += f"🏋️ WORKOUT MIX\n"
+            for workout_type, count in plan['plan'].items():
+                emoji = {"endurance": "🚴", "tempo": "⚡", "intervals": "🔥",
+                         "recovery": "💤", "rest": "🛋️"}.get(workout_type, "📝")
+                result += f"{emoji} {workout_type.capitalize()}: {count}x\n"
 
-            hours = data["time"].total_seconds() / 3600
+            result += f"\n💡 {plan['intensity_note']}\n"
 
-            result += f"{week}:\n"
+            return [TextContent(type="text", text=result)]
 
-            result += f"  🚴 {data['activities']} ritten\n"
+        else:
+            return [TextContent(type="text", text=f"Onbekende tool: {name}")]
 
-            result += f"  📏 {round(data['distance'], 1)} km\n"
-
-            result += f"  ⏱️ {round(hours, 1)} uur\n\n"
-
-        return [TextContent(type="text", text=result)]
-
-
-    elif name == "get_training_load_analysis":
-
-        activities = list(client.get_activities(limit=200))
-
-        # Bereken training loads
-
-        loads = calculate_training_loads(activities)
-
-        recommendation = get_training_recommendation(
-
-            loads["tsb"],
-
-            loads["atl"],
-
-            loads["ctl"]
-
-        )
-
-        # Bereken weekly trends
-
-        weekly_trends = calculate_weekly_trends(loads["daily_loads"], weeks=8)
-
-        # Bereken ramp rate
-
-        ramp_rate = calculate_ramp_rate(weekly_trends)
-
-        result = "🏋️ TRAINING LOAD ANALYSE\n\n"
-
-        result += f"📊 HUIDIGE STATUS\n"
-
-        result += f"ATL (Acute - 7 dagen): {loads['atl']}\n"
-
-        result += f"CTL (Chronic - 42 dagen): {loads['ctl']}\n"
-
-        result += f"TSB (Balance): {loads['tsb']}\n\n"
-
-        # Ramp rate warning
-
-        if ramp_rate:
-            result += f"📈 RAMP RATE (week-over-week)\n"
-
-            result += f"{ramp_rate['status']}: {ramp_rate['rate']:+.1f}%\n"
-
-            result += f"Vorige week ATL: {ramp_rate['previous_atl']}\n"
-
-            result += f"Deze week ATL: {ramp_rate['current_atl']}\n"
-
-            result += f"⚠️ {ramp_rate['warning']}\n\n"
-
-        result += f"🎯 ADVIES: {recommendation['status']}\n"
-
-        result += f"{recommendation['advice']}\n\n"
-
-        result += f"💪 Aanbevolen intensiteit:\n{recommendation['intensity']}\n\n"
-
-        result += f"📈 Fitness context:\n{recommendation['fitness_context']}\n\n"
-
-        # Weekly trends tabel
-
-        result += f"📊 WEEKLY TRENDS (laatste 8 weken)\n"
-
-        result += f"{'Week':<12} {'ATL':>6} {'CTL':>6} {'TSB':>6}\n"
-
-        result += f"{'-' * 12} {'-' * 6} {'-' * 6} {'-' * 6}\n"
-
-        for trend in weekly_trends[-8:]:  # Laatste 8 weken
-
-            result += f"{trend['week_label']:<12} {trend['atl']:>6.1f} {trend['ctl']:>6.1f} {trend['tsb']:>6.1f}\n"
-
-        return [TextContent(type="text", text=result)]
-
-    elif name == "get_weekly_training_plan":
-        activities = list(client.get_activities(limit=200))
-
-    # Bereken huidige status
-    loads = calculate_training_loads(activities)
-    weekly_trends = calculate_weekly_trends(loads["daily_loads"], weeks=8)
-    ramp_rate = calculate_ramp_rate(weekly_trends)
-
-    # Genereer weekplan
-    plan = generate_weekly_recommendation(
-        loads["tsb"],
-        loads["atl"],
-        loads["ctl"],
-        ramp_rate
-    )
-
-    result = "📋 WEEKTRAINING PLAN\n\n"
-    result += f"⏱️ VOLUME ADVIES\n"
-    result += f"Huidige week: ~{plan['current_hours']} uur\n"
-    result += f"Aanbevolen: ~{plan['target_hours']} uur\n"
-    result += f"{plan['volume_advice']}\n\n"
-
-    result += f"🏋️ WORKOUT MIX\n"
-    for workout_type, count in plan['plan'].items():
-        emoji = {"endurance": "🚴", "tempo": "⚡", "intervals": "🔥",
-                 "recovery": "💤", "rest": "🛋️"}.get(workout_type, "📝")
-        result += f"{emoji} {workout_type.capitalize()}: {count}x\n"
-
-    result += f"\n💡 {plan['intensity_note']}\n"
-
-    return [TextContent(type="text", text=result)]
-
-    return [TextContent(type="text", text=f"Onbekende tool: {name}")]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Fout bij uitvoeren van {name}: {str(e)}")]
 
 
 async def main():

@@ -1,4 +1,6 @@
 import os
+import stat
+from urllib.parse import urlparse, parse_qs
 from stravalib.client import Client
 from dotenv import load_dotenv
 import webbrowser
@@ -32,8 +34,15 @@ class StravaAuth:
         # Wacht op user input
         redirect_response = input("Plak de redirect URL: ")
 
-        # Haal code uit URL
-        code = redirect_response.split('code=')[1].split('&')[0]
+        # Haal code uit URL met veilige parsing
+        parsed = urlparse(redirect_response.strip())
+        params = parse_qs(parsed.query)
+        if 'code' not in params:
+            print("\n❌ Geen autorisatie code gevonden in de URL.")
+            print("Zorg dat je de volledige redirect URL plakt.")
+            return None
+
+        code = params['code'][0]
 
         # Wissel code voor tokens
         token_response = self.client.exchange_code_for_token(
@@ -53,10 +62,12 @@ class StravaAuth:
 
     def _update_env_tokens(self, access_token, refresh_token):
         """Update .env bestand met nieuwe tokens"""
-        with open('.env', 'r') as file:
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+
+        with open(env_path, 'r') as file:
             lines = file.readlines()
 
-        with open('.env', 'w') as file:
+        with open(env_path, 'w') as file:
             for line in lines:
                 if line.startswith('STRAVA_ACCESS_TOKEN='):
                     file.write(f'STRAVA_ACCESS_TOKEN={access_token}\n')
@@ -64,6 +75,8 @@ class StravaAuth:
                     file.write(f'STRAVA_REFRESH_TOKEN={refresh_token}\n')
                 else:
                     file.write(line)
+
+        os.chmod(env_path, stat.S_IRUSR | stat.S_IWUSR)
 
 
 # Test functie
