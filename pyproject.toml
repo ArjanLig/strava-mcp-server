@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "strava-mcp-server"
-version = "1.0.0"
+name = "strava-training-mcp"
+version = "1.0.2"
 description = "MCP server for Strava — training load analysis, weekly plans & activity tracking for Claude Desktop"
 readme = "README.md"
 license = "MIT"

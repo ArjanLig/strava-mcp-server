@@ -100,4 +100,4 @@ The DMG will be created in the `build/` folder.
 
 MIT
 
-<!-- mcp-name: io.github.ArjanLig/strava-mcp-server -->
+<!-- mcp-name: io.github.ArjanLig/strava-training-mcp -->

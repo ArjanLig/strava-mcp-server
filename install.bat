@@ -28,7 +28,17 @@ if %errorlevel% equ 0 (
     goto :python_ok
 )
 
-echo   Python 3 not found. Installing now...
+echo   Python 3 not found.
+echo.
+echo   This installer will download Python 3.13 from python.org
+echo   and install it automatically.
+echo.
+set /p INSTALL_PYTHON="  Continue? (y/n): "
+if /i not "!INSTALL_PYTHON!"=="y" (
+    echo   Installation cancelled. Install Python manually from https://www.python.org/downloads/
+    pause
+    exit /b 1
+)
 echo.
 
 :: Download Python installer
