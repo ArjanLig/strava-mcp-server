@@ -1,4 +1,5 @@
 import os
+import sys
 import stat
 import asyncio
 import tempfile
@@ -17,12 +18,35 @@ load_dotenv()
 # Initialiseer Strava client met auto-refresh
 def get_authenticated_client():
     """Maak authenticated client met auto token refresh"""
-    client = Client()
-
-    access_token = os.getenv('STRAVA_ACCESS_TOKEN')
-    refresh_token = os.getenv('STRAVA_REFRESH_TOKEN')
     client_id = os.getenv('STRAVA_CLIENT_ID')
     client_secret = os.getenv('STRAVA_CLIENT_SECRET')
+    access_token = os.getenv('STRAVA_ACCESS_TOKEN')
+    refresh_token = os.getenv('STRAVA_REFRESH_TOKEN')
+
+    placeholder_values = {'your_client_id_here', 'your_client_secret_here',
+                          'your_access_token_here', 'your_refresh_token_here', ''}
+
+    missing = []
+    if not client_id or client_id in placeholder_values:
+        missing.append('STRAVA_CLIENT_ID')
+    if not client_secret or client_secret in placeholder_values:
+        missing.append('STRAVA_CLIENT_SECRET')
+    if not access_token or access_token in placeholder_values:
+        missing.append('STRAVA_ACCESS_TOKEN')
+    if not refresh_token or refresh_token in placeholder_values:
+        missing.append('STRAVA_REFRESH_TOKEN')
+
+    if missing:
+        print("\n[ERROR] Missing or invalid Strava credentials.", file=sys.stderr)
+        print(f"  The following environment variables are not set: {', '.join(missing)}", file=sys.stderr)
+        print("\n  To fix this:", file=sys.stderr)
+        print("  1. Copy .env.example to .env (if you haven't already)", file=sys.stderr)
+        print("  2. Run: python strava_auth.py", file=sys.stderr)
+        print("  3. Follow the browser flow to authorize with Strava", file=sys.stderr)
+        print("  4. Your .env file will be populated automatically\n", file=sys.stderr)
+        sys.exit(1)
+
+    client = Client()
 
     # Probeer eerst met access token
     client.access_token = access_token
@@ -319,8 +343,16 @@ def generate_weekly_recommendation(tsb, atl, ctl, ramp_rate_data):
         "intensity_note": intensity_note
     }
 
-# Initialiseer client
-client = get_authenticated_client()
+# Lazy client initialization
+_client = None
+
+
+def get_client():
+    """Get or initialize the authenticated Strava client (lazy init)"""
+    global _client
+    if _client is None:
+        _client = get_authenticated_client()
+    return _client
 
 # Maak MCP server
 server = Server("strava-mcp")
@@ -398,7 +430,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     try:
         if name == "get_recent_activities":
             limit = min(int(arguments.get("limit", 10)), 30)
-            activities = client.get_activities(limit=limit)
+            activities = get_client().get_activities(limit=limit)
 
             result = "🚴 RECENTE ACTIVITEITEN\n\n"
             for activity in activities:
@@ -422,7 +454,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             except (ValueError, TypeError):
                 return [TextContent(type="text", text="Ongeldig activity ID. Moet een numerieke waarde zijn.")]
 
-            activity = client.get_activity(activity_id)
+            activity = get_client().get_activity(activity_id)
 
             result = f"📊 ACTIVITEIT DETAILS\n\n"
             result += f"🏷️ Naam: {activity.name}\n"
@@ -446,7 +478,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         elif name == "get_weekly_stats":
             weeks = min(int(arguments.get("weeks", 4)), 52)
-            activities = client.get_activities(limit=200)
+            activities = get_client().get_activities(limit=200)
 
             weekly_data = {}
             now = datetime.now()
@@ -488,7 +520,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
 
         elif name == "get_training_load_analysis":
-            activities = list(client.get_activities(limit=200))
+            activities = list(get_client().get_activities(limit=200))
 
             loads = calculate_training_loads(activities)
             recommendation = get_training_recommendation(
@@ -525,7 +557,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=result)]
 
         elif name == "get_weekly_training_plan":
-            activities = list(client.get_activities(limit=200))
+            activities = list(get_client().get_activities(limit=200))
 
             loads = calculate_training_loads(activities)
             weekly_trends = calculate_weekly_trends(loads["daily_loads"], weeks=8)
