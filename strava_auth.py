@@ -1,5 +1,6 @@
 import os
 import stat
+import tempfile
 from urllib.parse import urlparse, parse_qs
 from stravalib.client import Client
 from dotenv import load_dotenv
@@ -61,22 +62,27 @@ class StravaAuth:
         return token_response
 
     def _update_env_tokens(self, access_token, refresh_token):
-        """Update .env bestand met nieuwe tokens"""
+        """Update .env bestand met nieuwe tokens (atomic write)"""
         env_path = os.path.join(os.path.dirname(__file__), '.env')
 
         with open(env_path, 'r') as file:
             lines = file.readlines()
 
-        with open(env_path, 'w') as file:
-            for line in lines:
-                if line.startswith('STRAVA_ACCESS_TOKEN='):
-                    file.write(f'STRAVA_ACCESS_TOKEN={access_token}\n')
-                elif line.startswith('STRAVA_REFRESH_TOKEN='):
-                    file.write(f'STRAVA_REFRESH_TOKEN={refresh_token}\n')
-                else:
-                    file.write(line)
-
-        os.chmod(env_path, stat.S_IRUSR | stat.S_IWUSR)
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(env_path))
+        try:
+            with os.fdopen(fd, 'w') as tmp_file:
+                for line in lines:
+                    if line.startswith('STRAVA_ACCESS_TOKEN='):
+                        tmp_file.write(f'STRAVA_ACCESS_TOKEN={access_token}\n')
+                    elif line.startswith('STRAVA_REFRESH_TOKEN='):
+                        tmp_file.write(f'STRAVA_REFRESH_TOKEN={refresh_token}\n')
+                    else:
+                        tmp_file.write(line)
+            os.chmod(tmp_path, stat.S_IRUSR | stat.S_IWUSR)
+            os.replace(tmp_path, env_path)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
 
 
 # Test functie
