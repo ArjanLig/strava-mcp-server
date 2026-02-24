@@ -2,20 +2,20 @@
 setlocal enabledelayedexpansion
 
 echo ===================================================
-echo        Strava MCP Server - Installatie
+echo        Strava MCP Server - Installation
 echo ===================================================
 echo.
 
 set "INSTALL_DIR=%USERPROFILE%\strava-mcp"
 set "SCRIPT_DIR=%~dp0"
 
-:: ============= STAP 1: Python check =============
-echo [1/6] Python controleren...
+:: ============= STEP 1: Python check =============
+echo [1/6] Checking Python...
 
 where python >nul 2>nul
 if %errorlevel% equ 0 (
     for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
-    echo   OK: !PYTHON_VERSION! gevonden
+    echo   OK: !PYTHON_VERSION! found
     set "PYTHON_CMD=python"
     goto :python_ok
 )
@@ -23,23 +23,23 @@ if %errorlevel% equ 0 (
 where python3 >nul 2>nul
 if %errorlevel% equ 0 (
     for /f "tokens=*" %%i in ('python3 --version 2^>^&1') do set PYTHON_VERSION=%%i
-    echo   OK: !PYTHON_VERSION! gevonden
+    echo   OK: !PYTHON_VERSION! found
     set "PYTHON_CMD=python3"
     goto :python_ok
 )
 
-echo   Python 3 niet gevonden. Wordt nu geinstalleerd...
+echo   Python 3 not found. Installing now...
 echo.
 
 :: Download Python installer
-echo   Downloaden van python.org...
+echo   Downloading from python.org...
 powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.13.2/python-3.13.2-amd64.exe' -OutFile '%TEMP%\python-installer.exe'"
 
-:: Installeer Python (silent, met PATH)
-echo   Installeren...
+:: Install Python (silent, with PATH)
+echo   Installing...
 "%TEMP%\python-installer.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
 
-:: Wacht even tot installatie klaar is
+:: Wait for installation to finish
 timeout /t 5 /nobreak >nul
 
 :: Refresh PATH
@@ -51,24 +51,24 @@ where python >nul 2>nul
 if %errorlevel% equ 0 (
     set "PYTHON_CMD=python"
     for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
-    echo   OK: !PYTHON_VERSION! geinstalleerd
+    echo   OK: !PYTHON_VERSION! installed
 ) else (
-    echo   FOUT: Python installatie mislukt.
-    echo   Download handmatig via https://www.python.org/downloads/
+    echo   ERROR: Python installation failed.
+    echo   Download manually from https://www.python.org/downloads/
     pause
     exit /b 1
 )
 
 :python_ok
 
-:: ============= STAP 2: Bestanden kopieren =============
+:: ============= STEP 2: Copy files =============
 echo.
-echo [2/6] Bestanden installeren naar %INSTALL_DIR%...
+echo [2/6] Installing files to %INSTALL_DIR%...
 
 if exist "%INSTALL_DIR%" (
-    set /p OVERWRITE="  Map bestaat al. Overschrijven? (j/n): "
-    if /i not "!OVERWRITE!"=="j" (
-        echo   Installatie afgebroken.
+    set /p OVERWRITE="  Directory already exists. Overwrite? (y/n): "
+    if /i not "!OVERWRITE!"=="y" (
+        echo   Installation cancelled.
         pause
         exit /b 0
     )
@@ -83,45 +83,45 @@ if not exist "%INSTALL_DIR%\.env" (
     copy /y "%SCRIPT_DIR%.env.example" "%INSTALL_DIR%\.env" >nul
 )
 
-echo   OK: Bestanden gekopieerd
+echo   OK: Files copied
 
-:: ============= STAP 3: Virtual environment =============
+:: ============= STEP 3: Virtual environment =============
 echo.
-echo [3/6] Virtual environment aanmaken...
+echo [3/6] Creating virtual environment...
 
 if exist "%INSTALL_DIR%\.venv" (
-    echo   OK: .venv bestaat al
+    echo   OK: .venv already exists
 ) else (
     %PYTHON_CMD% -m venv "%INSTALL_DIR%\.venv"
-    echo   OK: .venv aangemaakt
+    echo   OK: .venv created
 )
 
-:: ============= STAP 4: Dependencies =============
+:: ============= STEP 4: Dependencies =============
 echo.
-echo [4/6] Dependencies installeren...
+echo [4/6] Installing dependencies...
 
 "%INSTALL_DIR%\.venv\Scripts\pip.exe" install --quiet --upgrade pip
 "%INSTALL_DIR%\.venv\Scripts\pip.exe" install --quiet -r "%INSTALL_DIR%\requirements.txt"
-echo   OK: Alle packages geinstalleerd
+echo   OK: All packages installed
 
-:: ============= STAP 5: Strava API credentials =============
+:: ============= STEP 5: Strava API credentials =============
 echo.
-echo [5/6] Strava API instellen...
+echo [5/6] Setting up Strava API...
 echo.
 
-:: Check of credentials al bestaan
+:: Check if credentials already exist
 set "HAS_CREDENTIALS="
 for /f "tokens=2 delims==" %%a in ('findstr "^STRAVA_CLIENT_ID=" "%INSTALL_DIR%\.env" 2^>nul') do (
     if not "%%a"=="your_client_id_here" if not "%%a"=="" set "HAS_CREDENTIALS=1"
 )
 
 if defined HAS_CREDENTIALS (
-    echo   OK: Strava credentials al geconfigureerd
+    echo   OK: Strava credentials already configured
 ) else (
-    echo   Je hebt een Strava API applicatie nodig.
+    echo   You need a Strava API application.
     echo.
-    echo   Stap 1: Ga naar https://www.strava.com/settings/api
-    echo   Stap 2: Maak een nieuwe applicatie aan:
+    echo   Step 1: Go to https://www.strava.com/settings/api
+    echo   Step 2: Create a new application:
     echo           - Application Name: MCP Server
     echo           - Category: Data Analysis
     echo           - Website: http://localhost
@@ -139,9 +139,9 @@ if defined HAS_CREDENTIALS (
     ) > "%INSTALL_DIR%\.env"
 
     echo.
-    echo   OK: Credentials opgeslagen
+    echo   OK: Credentials saved
     echo.
-    echo   Nu gaan we je Strava account koppelen...
+    echo   Now we'll connect your Strava account...
     echo.
 
     cd /d "%INSTALL_DIR%"
@@ -149,9 +149,9 @@ if defined HAS_CREDENTIALS (
     echo.
 )
 
-:: ============= STAP 6: Claude Desktop configuratie =============
+:: ============= STEP 6: Configure Claude Desktop =============
 echo.
-echo [6/6] Claude Desktop configureren...
+echo [6/6] Configuring Claude Desktop...
 
 set "VENV_PYTHON=%INSTALL_DIR%\.venv\Scripts\python.exe"
 set "SERVER_PATH=%INSTALL_DIR%\server.py"
@@ -163,31 +163,31 @@ mkdir "%CLAUDE_CONFIG_DIR%" 2>nul
 if exist "%CLAUDE_CONFIG_FILE%" (
     findstr /c:"\"strava\"" "%CLAUDE_CONFIG_FILE%" >nul 2>nul
     if !errorlevel! equ 0 (
-        echo   OK: Strava MCP al geconfigureerd in Claude Desktop
+        echo   OK: Strava MCP already configured in Claude Desktop
     ) else (
         "%INSTALL_DIR%\.venv\Scripts\python.exe" -c "import json,sys;f=open(sys.argv[1],'r');c=json.load(f);f.close();c.setdefault('mcpServers',{});c['mcpServers']['strava']={'command':sys.argv[2],'args':[sys.argv[3]]};f=open(sys.argv[1],'w');json.dump(c,f,indent=2);f.close()" "%CLAUDE_CONFIG_FILE%" "%VENV_PYTHON%" "%SERVER_PATH%"
-        echo   OK: Strava MCP toegevoegd aan bestaande Claude Desktop config
+        echo   OK: Strava MCP added to existing Claude Desktop config
     )
 ) else (
     "%INSTALL_DIR%\.venv\Scripts\python.exe" -c "import json,sys;c={'mcpServers':{'strava':{'command':sys.argv[1],'args':[sys.argv[2]]}}};f=open(sys.argv[3],'w');json.dump(c,f,indent=2);f.close()" "%VENV_PYTHON%" "%SERVER_PATH%" "%CLAUDE_CONFIG_FILE%"
-    echo   OK: Claude Desktop config aangemaakt
+    echo   OK: Claude Desktop config created
 )
 
-:: ============= KLAAR =============
+:: ============= DONE =============
 echo.
 echo ===================================================
-echo        Installatie voltooid!
+echo        Installation complete!
 echo ===================================================
 echo.
-echo   Herstart Claude Desktop om de Strava MCP te gebruiken.
+echo   Restart Claude Desktop to use the Strava MCP.
 echo.
-echo   Beschikbare tools in Claude:
-echo     - get_recent_activities       Recente ritten
-echo     - get_activity_details        Details van een rit
-echo     - get_weekly_stats            Wekelijkse stats
-echo     - get_training_load_analysis  ATL/CTL/TSB analyse
-echo     - get_weekly_training_plan    Weektraining advies
+echo   Available tools in Claude:
+echo     - get_recent_activities       Recent rides
+echo     - get_activity_details        Activity details
+echo     - get_weekly_stats            Weekly stats
+echo     - get_training_load_analysis  ATL/CTL/TSB analysis
+echo     - get_weekly_training_plan    Weekly training advice
 echo.
-echo   Geinstalleerd in: %INSTALL_DIR%
+echo   Installed in: %INSTALL_DIR%
 echo.
 pause

@@ -6,7 +6,7 @@ from stravalib.client import Client
 from dotenv import load_dotenv
 import webbrowser
 
-# Laad environment variables
+# Load environment variables
 load_dotenv()
 
 
@@ -17,52 +17,52 @@ class StravaAuth:
         self.client = Client()
 
     def authorize(self):
-        """Start OAuth flow - opent browser voor autorisatie"""
+        """Start OAuth flow — opens browser for authorization"""
         authorize_url = self.client.authorization_url(
             client_id=self.client_id,
             redirect_uri='http://localhost:8000/authorized',
             scope=['read', 'activity:read_all']
         )
 
-        print(f"\n🔑 Open deze URL in je browser:")
+        print(f"\n🔑 Open this URL in your browser:")
         print(authorize_url)
-        print("\nNa autorisatie krijg je een URL met 'code=...'")
-        print("Kopieer de hele URL en plak hier:\n")
+        print("\nAfter authorization you'll get a URL with 'code=...'")
+        print("Copy the full URL and paste it here:\n")
 
-        # Open automatisch de browser
+        # Open browser automatically
         webbrowser.open(authorize_url)
 
-        # Wacht op user input
-        redirect_response = input("Plak de redirect URL: ")
+        # Wait for user input
+        redirect_response = input("Paste the redirect URL: ")
 
-        # Haal code uit URL met veilige parsing
+        # Extract code from URL
         parsed = urlparse(redirect_response.strip())
         params = parse_qs(parsed.query)
         if 'code' not in params:
-            print("\n❌ Geen autorisatie code gevonden in de URL.")
-            print("Zorg dat je de volledige redirect URL plakt.")
+            print("\n❌ No authorization code found in the URL.")
+            print("Make sure you paste the complete redirect URL.")
             return None
 
         code = params['code'][0]
 
-        # Wissel code voor tokens
+        # Exchange code for tokens
         token_response = self.client.exchange_code_for_token(
             client_id=self.client_id,
             client_secret=self.client_secret,
             code=code
         )
 
-        # Update .env bestand
+        # Update .env file
         self._update_env_tokens(
             token_response['access_token'],
             token_response['refresh_token']
         )
 
-        print("\n✅ Authenticatie gelukt! Tokens opgeslagen in .env")
+        print("\n✅ Authentication successful! Tokens saved to .env")
         return token_response
 
     def _update_env_tokens(self, access_token, refresh_token):
-        """Update .env bestand met nieuwe tokens (atomic write)"""
+        """Update .env file with new tokens (atomic write)"""
         env_path = os.path.join(os.path.dirname(__file__), '.env')
 
         with open(env_path, 'r') as file:
@@ -85,7 +85,6 @@ class StravaAuth:
             raise
 
 
-# Test functie
 if __name__ == "__main__":
     auth = StravaAuth()
     auth.authorize()

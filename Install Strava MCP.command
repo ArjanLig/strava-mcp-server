@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Kleuren
+# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -11,28 +11,28 @@ NC='\033[0m'
 
 clear
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}       Strava MCP Server — Installatie${NC}"
+echo -e "${BLUE}       Strava MCP Server — Installation${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Bepaal waar het .command bestand staat (in de DMG of lokaal)
+# Determine where the .command file is located
 SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Installatie locatie
+# Installation location
 INSTALL_DIR="$HOME/strava-mcp"
 
-# ============= STAP 1: Python check =============
-echo -e "${YELLOW}[1/6]${NC} Python controleren..."
+# ============= STEP 1: Python check =============
+echo -e "${YELLOW}[1/6]${NC} Checking Python..."
 
 if command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
     PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
-    echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION gevonden"
+    echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION found"
 else
-    echo -e "  ${YELLOW}!${NC} Python 3 niet gevonden. Wordt nu geinstalleerd..."
+    echo -e "  ${YELLOW}!${NC} Python 3 not found. Installing now..."
     echo ""
 
-    # Detecteer chip type voor juiste installer
+    # Detect chip type for correct installer
     ARCH=$(uname -m)
     if [ "$ARCH" = "arm64" ]; then
         PKG_URL="https://www.python.org/ftp/python/3.13.2/python-3.13.2-macos11.pkg"
@@ -42,39 +42,39 @@ else
 
     PKG_FILE="/tmp/python-installer.pkg"
 
-    echo -e "  Downloaden van python.org..."
+    echo -e "  Downloading from python.org..."
     curl -L -o "$PKG_FILE" "$PKG_URL" 2>/dev/null
 
-    echo -e "  Installeren (je moet mogelijk je wachtwoord invoeren)..."
+    echo -e "  Installing (you may need to enter your password)..."
     sudo installer -pkg "$PKG_FILE" -target /
     rm -f "$PKG_FILE"
 
-    # Refresh PATH zodat python3 gevonden wordt
+    # Refresh PATH so python3 can be found
     export PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:$PATH"
 
     if command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
         PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
-        echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION geinstalleerd"
+        echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION installed"
     else
-        echo -e "  ${RED}✗ Python installatie mislukt.${NC}"
-        echo "  Download handmatig via https://www.python.org/downloads/"
+        echo -e "  ${RED}✗ Python installation failed.${NC}"
+        echo "  Download manually from https://www.python.org/downloads/"
         echo ""
-        echo "  Druk op Enter om af te sluiten..."
+        echo "  Press Enter to close..."
         read
         exit 1
     fi
 fi
 
-# ============= STAP 2: Bestanden kopieren =============
-echo -e "${YELLOW}[2/6]${NC} Bestanden installeren naar $INSTALL_DIR..."
+# ============= STEP 2: Copy files =============
+echo -e "${YELLOW}[2/6]${NC} Installing files to $INSTALL_DIR..."
 
 if [ -d "$INSTALL_DIR" ]; then
-    echo -e "  ${YELLOW}!${NC} Map $INSTALL_DIR bestaat al."
-    read -p "  Overschrijven? (j/n): " OVERWRITE
-    if [ "$OVERWRITE" != "j" ] && [ "$OVERWRITE" != "J" ]; then
-        echo "  Installatie afgebroken."
-        echo "  Druk op Enter om af te sluiten..."
+    echo -e "  ${YELLOW}!${NC} Directory $INSTALL_DIR already exists."
+    read -p "  Overwrite? (y/n): " OVERWRITE
+    if [ "$OVERWRITE" != "y" ] && [ "$OVERWRITE" != "Y" ]; then
+        echo "  Installation cancelled."
+        echo "  Press Enter to close..."
         read
         exit 0
     fi
@@ -85,49 +85,49 @@ cp "$SOURCE_DIR/server.py" "$INSTALL_DIR/"
 cp "$SOURCE_DIR/strava_auth.py" "$INSTALL_DIR/"
 cp "$SOURCE_DIR/requirements.txt" "$INSTALL_DIR/"
 
-# Kopieer .env alleen als die nog niet bestaat (behoud bestaande tokens)
+# Only copy .env if it doesn't exist yet (preserve existing tokens)
 if [ ! -f "$INSTALL_DIR/.env" ]; then
     cp "$SOURCE_DIR/.env.example" "$INSTALL_DIR/.env"
 fi
 
-echo -e "  ${GREEN}✓${NC} Bestanden gekopieerd"
+echo -e "  ${GREEN}✓${NC} Files copied"
 
-# ============= STAP 3: Virtual environment =============
-echo -e "${YELLOW}[3/6]${NC} Virtual environment aanmaken..."
+# ============= STEP 3: Virtual environment =============
+echo -e "${YELLOW}[3/6]${NC} Creating virtual environment..."
 
 if [ -d "$INSTALL_DIR/.venv" ]; then
-    echo -e "  ${GREEN}✓${NC} .venv bestaat al"
+    echo -e "  ${GREEN}✓${NC} .venv already exists"
 else
     $PYTHON_CMD -m venv "$INSTALL_DIR/.venv"
-    echo -e "  ${GREEN}✓${NC} .venv aangemaakt"
+    echo -e "  ${GREEN}✓${NC} .venv created"
 fi
 
 source "$INSTALL_DIR/.venv/bin/activate"
 
-# ============= STAP 4: Dependencies =============
-echo -e "${YELLOW}[4/6]${NC} Dependencies installeren..."
+# ============= STEP 4: Dependencies =============
+echo -e "${YELLOW}[4/6]${NC} Installing dependencies..."
 
 pip install --quiet --upgrade pip
 pip install --quiet -r "$INSTALL_DIR/requirements.txt"
-echo -e "  ${GREEN}✓${NC} Alle packages geinstalleerd"
+echo -e "  ${GREEN}✓${NC} All packages installed"
 
-# ============= STAP 5: Strava API credentials =============
-echo -e "${YELLOW}[5/6]${NC} Strava API instellen..."
+# ============= STEP 5: Strava API credentials =============
+echo -e "${YELLOW}[5/6]${NC} Setting up Strava API..."
 echo ""
 
-# Check of credentials al bestaan
+# Check if credentials already exist
 EXISTING_CLIENT_ID=""
 if [ -f "$INSTALL_DIR/.env" ]; then
     EXISTING_CLIENT_ID=$(grep "^STRAVA_CLIENT_ID=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
 fi
 
 if [ -n "$EXISTING_CLIENT_ID" ]; then
-    echo -e "  ${GREEN}✓${NC} Strava credentials al geconfigureerd"
+    echo -e "  ${GREEN}✓${NC} Strava credentials already configured"
 else
-    echo -e "  ${BOLD}Je hebt een Strava API applicatie nodig.${NC}"
+    echo -e "  ${BOLD}You need a Strava API application.${NC}"
     echo ""
-    echo "  Stap 1: Ga naar ${BLUE}https://www.strava.com/settings/api${NC}"
-    echo "  Stap 2: Maak een nieuwe applicatie aan:"
+    echo "  Step 1: Go to ${BLUE}https://www.strava.com/settings/api${NC}"
+    echo "  Step 2: Create a new application:"
     echo "          - Application Name: MCP Server"
     echo "          - Category: Data Analysis"
     echo "          - Website: http://localhost"
@@ -145,9 +145,9 @@ STRAVA_REFRESH_TOKEN=
 EOF
 
     echo ""
-    echo -e "  ${GREEN}✓${NC} Credentials opgeslagen"
+    echo -e "  ${GREEN}✓${NC} Credentials saved"
     echo ""
-    echo -e "  ${BOLD}Nu gaan we je Strava account koppelen...${NC}"
+    echo -e "  ${BOLD}Now we'll connect your Strava account...${NC}"
     echo ""
 
     cd "$INSTALL_DIR"
@@ -155,8 +155,8 @@ EOF
     echo ""
 fi
 
-# ============= STAP 6: Claude Desktop configuratie =============
-echo -e "${YELLOW}[6/6]${NC} Claude Desktop configureren..."
+# ============= STEP 6: Configure Claude Desktop =============
+echo -e "${YELLOW}[6/6]${NC} Configuring Claude Desktop..."
 
 VENV_PYTHON="$INSTALL_DIR/.venv/bin/python"
 SERVER_PATH="$INSTALL_DIR/server.py"
@@ -168,9 +168,9 @@ mkdir -p "$CLAUDE_CONFIG_DIR"
 
 if [ -f "$CLAUDE_CONFIG_FILE" ]; then
     if grep -q '"strava"' "$CLAUDE_CONFIG_FILE"; then
-        echo -e "  ${GREEN}✓${NC} Strava MCP al geconfigureerd in Claude Desktop"
+        echo -e "  ${GREEN}✓${NC} Strava MCP already configured in Claude Desktop"
     else
-        # Voeg strava toe aan bestaande config met python (paden via argv)
+        # Add strava to existing config with python (paths via argv)
         "$INSTALL_DIR/.venv/bin/python" -c "
 import json, sys
 config_file, python_path, server_path = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -185,7 +185,7 @@ config['mcpServers']['strava'] = {
 with open(config_file, 'w') as f:
     json.dump(config, f, indent=2)
 " "$CLAUDE_CONFIG_FILE" "$VENV_PYTHON" "$SERVER_PATH"
-        echo -e "  ${GREEN}✓${NC} Strava MCP toegevoegd aan bestaande Claude Desktop config"
+        echo -e "  ${GREEN}✓${NC} Strava MCP added to existing Claude Desktop config"
     fi
 else
     cat > "$CLAUDE_CONFIG_FILE" << EOF
@@ -200,25 +200,25 @@ else
   }
 }
 EOF
-    echo -e "  ${GREEN}✓${NC} Claude Desktop config aangemaakt"
+    echo -e "  ${GREEN}✓${NC} Claude Desktop config created"
 fi
 
-# ============= KLAAR =============
+# ============= DONE =============
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}       Installatie voltooid!${NC}"
+echo -e "${GREEN}       Installation complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "  Herstart Claude Desktop om de Strava MCP te gebruiken."
+echo "  Restart Claude Desktop to use the Strava MCP."
 echo ""
-echo "  Beschikbare tools in Claude:"
-echo "    - get_recent_activities       Recente ritten"
-echo "    - get_activity_details        Details van een rit"
-echo "    - get_weekly_stats            Wekelijkse stats"
-echo "    - get_training_load_analysis  ATL/CTL/TSB analyse"
-echo "    - get_weekly_training_plan    Weektraining advies"
+echo "  Available tools in Claude:"
+echo "    - get_recent_activities       Recent rides"
+echo "    - get_activity_details        Activity details"
+echo "    - get_weekly_stats            Weekly stats"
+echo "    - get_training_load_analysis  ATL/CTL/TSB analysis"
+echo "    - get_weekly_training_plan    Weekly training advice"
 echo ""
-echo "  Geinstalleerd in: $INSTALL_DIR"
+echo "  Installed in: $INSTALL_DIR"
 echo ""
-echo "  Druk op Enter om af te sluiten..."
+echo "  Press Enter to close..."
 read
