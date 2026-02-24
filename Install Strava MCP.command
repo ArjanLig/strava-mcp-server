@@ -81,7 +81,7 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 
 mkdir -p "$INSTALL_DIR"
-cp "$SOURCE_DIR/Server.py" "$INSTALL_DIR/"
+cp "$SOURCE_DIR/server.py" "$INSTALL_DIR/"
 cp "$SOURCE_DIR/strava_auth.py" "$INSTALL_DIR/"
 cp "$SOURCE_DIR/requirements.txt" "$INSTALL_DIR/"
 
@@ -159,7 +159,7 @@ fi
 echo -e "${YELLOW}[6/6]${NC} Claude Desktop configureren..."
 
 VENV_PYTHON="$INSTALL_DIR/.venv/bin/python"
-SERVER_PATH="$INSTALL_DIR/Server.py"
+SERVER_PATH="$INSTALL_DIR/server.py"
 
 CLAUDE_CONFIG_DIR="$HOME/Library/Application Support/Claude"
 CLAUDE_CONFIG_FILE="$CLAUDE_CONFIG_DIR/claude_desktop_config.json"

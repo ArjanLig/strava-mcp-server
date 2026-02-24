@@ -24,7 +24,7 @@ mkdir -p "$STAGING_DIR/Strava MCP"
 echo -e "${YELLOW}[1/3]${NC} Bestanden kopieren..."
 
 # Kopieer project bestanden
-cp "$PROJECT_DIR/Server.py"         "$STAGING_DIR/Strava MCP/"
+cp "$PROJECT_DIR/server.py"         "$STAGING_DIR/Strava MCP/"
 cp "$PROJECT_DIR/strava_auth.py"    "$STAGING_DIR/Strava MCP/"
 cp "$PROJECT_DIR/requirements.txt"  "$STAGING_DIR/Strava MCP/"
 cp "$PROJECT_DIR/.env.example"      "$STAGING_DIR/Strava MCP/"
