@@ -91,7 +91,7 @@ The DMG will be created in the `build/` folder.
 
 ## Requirements
 
-- macOS
+- macOS or Windows 10+
 - Python 3.10+
 - A Strava account with API access
 - Claude Desktop
