@@ -134,14 +134,24 @@ echo -e "  ${GREEN}✓${NC} All packages installed"
 echo -e "${YELLOW}[5/6]${NC} Setting up Strava API..."
 echo ""
 
-# Check if credentials already exist
+# Check if credentials AND authorization already exist
 EXISTING_CLIENT_ID=""
+EXISTING_REFRESH=""
 if [ -f "$INSTALL_DIR/.env" ]; then
     EXISTING_CLIENT_ID=$(grep "^STRAVA_CLIENT_ID=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
+    EXISTING_REFRESH=$(grep "^STRAVA_REFRESH_TOKEN=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
 fi
 
-if [ -n "$EXISTING_CLIENT_ID" ]; then
+if [ -n "$EXISTING_CLIENT_ID" ] && [ -n "$EXISTING_REFRESH" ]; then
     echo -e "  ${GREEN}✓${NC} Strava credentials already configured"
+elif [ -n "$EXISTING_CLIENT_ID" ]; then
+    # Have credentials but no authorization yet — run auth
+    echo -e "  ${YELLOW}!${NC} Credentials found, but not yet authorized."
+    echo -e "  ${BOLD}Opening Strava to authorize...${NC}"
+    echo ""
+    cd "$INSTALL_DIR"
+    $PYTHON_CMD "$INSTALL_DIR/strava_auth.py"
+    echo ""
 else
     echo -e "  ${BOLD}You need a Strava API application.${NC}"
     echo ""
