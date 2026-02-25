@@ -24,12 +24,26 @@ INSTALL_DIR="$HOME/strava-mcp"
 # ============= STEP 1: Python check =============
 echo -e "${YELLOW}[1/6]${NC} Checking Python..."
 
+NEED_INSTALL=false
+
 if command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
     PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
-    echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION found"
+    # Check if version is at least 3.10
+    PY_MINOR=$($PYTHON_CMD -c "import sys; print(sys.version_info.minor)")
+    if [ "$PY_MINOR" -lt 10 ]; then
+        echo -e "  ${YELLOW}!${NC} $PYTHON_VERSION found, but Python 3.10+ is required."
+        NEED_INSTALL=true
+    else
+        echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION found"
+    fi
 else
-    echo -e "  ${YELLOW}!${NC} Python 3 not found. Installing now..."
+    echo -e "  ${YELLOW}!${NC} Python 3 not found."
+    NEED_INSTALL=true
+fi
+
+if [ "$NEED_INSTALL" = true ]; then
+    echo -e "  Installing Python 3.13..."
     echo ""
 
     # Detect chip type for correct installer
@@ -49,11 +63,16 @@ else
     sudo installer -pkg "$PKG_FILE" -target /
     rm -f "$PKG_FILE"
 
-    # Refresh PATH so python3 can be found
+    # Refresh PATH so new python3 is found first
     export PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:$PATH"
 
-    if command -v python3 &> /dev/null; then
+    if command -v python3.13 &> /dev/null; then
+        PYTHON_CMD="python3.13"
+    elif command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
+    fi
+
+    if [ -n "$PYTHON_CMD" ]; then
         PYTHON_VERSION=$($PYTHON_CMD --version 2>&1)
         echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION installed"
     else

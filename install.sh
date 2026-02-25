@@ -19,6 +19,12 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 PYTHON_VERSION=$(python3 --version 2>&1)
+PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+if [ "$PY_MINOR" -lt 10 ]; then
+    echo "❌ $PYTHON_VERSION found, but Python 3.10+ is required."
+    echo "   Upgrade via: brew install python"
+    exit 1
+fi
 echo "   ✅ $PYTHON_VERSION"
 
 # 2. Virtual environment
