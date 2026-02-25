@@ -14,11 +14,12 @@ MCP (Model Context Protocol) server that connects your Strava training data to C
 
 ### Option 1: DMG Installer (easiest)
 
-1. Download the latest `.dmg` from [Releases](../../releases)
-2. Open the DMG
-3. Double-click **`Install Strava MCP.command`**
-4. Follow the steps in Terminal
-5. Restart Claude Desktop
+1. Go to [https://www.strava.com/settings/api](https://www.strava.com/settings/api) and create a new application (Category: **Data Analysis**, Callback Domain: **localhost**). Note your **Client ID** and **Client Secret**.
+2. Download the latest `.dmg` from [Releases](../../releases)
+3. Open the DMG
+4. Double-click **`Install Strava MCP.command`**
+5. Follow the steps in Terminal — you'll be asked for your Client ID and Secret
+6. Restart Claude Desktop
 
 ### Option 2: Quick install from source (macOS/Linux)
 
